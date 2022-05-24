@@ -1,5 +1,6 @@
+use byteorder::{ReadBytesExt, WriteBytesExt};
+use paste::paste;
 use std::io::{Read, Result as IoResult, Write};
-use byteorder::ReadBytesExt;
 use std::ops::{Deref, DerefMut};
 
 pub trait Encode {
@@ -9,6 +10,55 @@ pub trait Encode {
 pub trait Decode: Sized {
     fn decode(reader: &mut impl Read) -> IoResult<Self>;
 }
+
+impl Encode for u8 {
+    fn encode(&self, writer: &mut impl Write) -> IoResult<()> {
+        writer.write_u8(*self)
+    }
+}
+
+impl Decode for u8 {
+    fn decode(reader: &mut impl Read) -> IoResult<Self> {
+        reader.read_u8()
+    }
+}
+
+impl Encode for i8 {
+    fn encode(&self, writer: &mut impl Write) -> IoResult<()> {
+        writer.write_i8(*self)
+    }
+}
+
+impl Decode for i8 {
+    fn decode(reader: &mut impl Read) -> IoResult<Self> {
+        reader.read_i8()
+    }
+}
+
+macro_rules! impl_ordered_int (
+    ($type: ident) => (
+        impl Encode for $type {
+            fn encode(&self, writer: &mut impl Write) -> IoResult<()> {
+                paste! { writer.[<write_ $type>]::<byteorder::LittleEndian>(*self) }
+            }
+        }
+
+        impl Decode for $type {
+            fn decode(reader: &mut impl Read) -> IoResult<Self> {
+                paste! { reader.[<read_ $type>]::<byteorder::LittleEndian>() }
+            }
+        }
+    )
+);
+
+impl_ordered_int!(u16);
+impl_ordered_int!(u32);
+impl_ordered_int!(u64);
+impl_ordered_int!(u128);
+impl_ordered_int!(i16);
+impl_ordered_int!(i32);
+impl_ordered_int!(i64);
+impl_ordered_int!(i128);
 
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -132,6 +182,44 @@ mod tests {
         let mut reader = buf.as_slice();
         let decoded = T::decode(&mut reader).unwrap();
         assert_eq!(original, decoded, "Round-trip encoded values do not match!");
+    }
+
+    mod int {
+        use super::*;
+
+        macro_rules! test_int (
+            ($type: ident) => (
+                mod $type {
+                    use super::*;
+
+                    #[test]
+                    fn min() {
+                        test_roundtrip($type::MIN);
+                    }
+
+                    #[test]
+                    fn max() {
+                        test_roundtrip($type::MAX);
+                    }
+
+                    #[test]
+                    fn one() {
+                        test_roundtrip(1 as $type);
+                    }
+                }
+            )
+        );
+
+        test_int!(u8);
+        test_int!(u16);
+        test_int!(u32);
+        test_int!(u64);
+        test_int!(u128);
+        test_int!(i8);
+        test_int!(i16);
+        test_int!(i32);
+        test_int!(i64);
+        test_int!(i128);
     }
 
     mod var {
