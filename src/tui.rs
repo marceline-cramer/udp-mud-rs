@@ -1,4 +1,5 @@
 use crossbeam_channel::{Receiver, Sender};
+use cursive::theme::*;
 use cursive::traits::*;
 use cursive::views::*;
 use cursive::{Cursive, CursiveExt};
@@ -19,6 +20,16 @@ impl Tui {
         let (edit_sender, edit_receiver) = crossbeam_channel::unbounded();
         let mut cursive = Cursive::new();
         cursive.set_user_data(edit_sender);
+
+        cursive.update_theme(|theme| {
+            theme.shadow = false;
+            theme.borders = BorderStyle::Simple;
+
+            let palette = &mut theme.palette;
+            palette[PaletteColor::Background] = Color::TerminalDefault;
+            palette[PaletteColor::View] = Color::TerminalDefault;
+            palette[PaletteColor::Primary] = Color::TerminalDefault;
+        });
 
         Self {
             cursive,
