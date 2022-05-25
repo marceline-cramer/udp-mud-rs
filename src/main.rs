@@ -5,6 +5,8 @@ use protocol_derive::{Decode, Encode};
 use std::collections::HashMap;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 
+mod tui;
+
 #[derive(Parser, Debug)]
 #[clap(
     author = "Marceline Cramer",
@@ -39,32 +41,10 @@ pub enum PacketKind {
 }
 
 #[derive(Debug, Decode, Encode)]
-pub struct Pronouns {
-    /// Non-zero for true, zero for false.
-    pub case_sensitive: u8, // TODO bitfield or bool protocol impl?
-
-    /// Ex. he, she, they, fae.
-    pub subject: String,
-
-    /// Ex. him, her, them, faer.
-    pub object: String,
-
-    /// Ex. his, her, their, faer.
-    pub possessive: String,
-
-    /// Ex. his, hers, theirs, faers.
-    pub possessive_pronoun: String,
-
-    /// Ex. himself, herself, themself, faerself.
-    pub reflexive: String,
-}
-
-#[derive(Debug, Decode, Encode)]
 pub struct UserInfo {
     pub id: String,
     pub username: String,
     pub about: String,
-    pub pronouns: Pronouns,
 }
 
 #[derive(Debug, Decode, Encode)]
@@ -92,6 +72,7 @@ pub struct Room {
 
 pub struct App {
     args: Args,
+    tui: tui::Tui,
     socket: UdpSocket,
     owned_rooms: HashMap<String, Room>,
     remote_rooms: HashMap<String, Room>,
@@ -102,6 +83,7 @@ impl App {
         let socket = UdpSocket::bind(args.bind_addr).unwrap();
         let mut app = Self {
             args,
+            tui: tui::Tui::new(),
             owned_rooms: Default::default(),
             remote_rooms: Default::default(),
             socket,
@@ -115,19 +97,21 @@ impl App {
             self.send_empty_packet(connect, PacketKind::Ping).unwrap();
         }
 
-        let room = Room { 
-            info: RoomInfo { 
+        let room = Room {
+            info: RoomInfo {
                 id: format!("{}_owned_room", self.args.username),
                 title: format!("{}'s Bombass Owned Room", self.args.username),
                 short_about: "An automatically-created room for testing.".into(),
                 long_about: "".into(),
-            }
+            },
         };
 
         self.owned_rooms.insert(room.info.id.clone(), room);
     }
 
     pub fn run(mut self) {
+        self.tui.run();
+
         let mut buf = [0u8; 65507];
         while let Ok((len, from)) = self.socket.recv_from(&mut buf) {
             let mut buf = buf.as_slice();

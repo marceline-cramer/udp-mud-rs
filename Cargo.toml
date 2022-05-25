@@ -11,6 +11,8 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "3", features = ["derive"] }
+crossbeam-channel = "0.5"
+cursive = { version = "0.18", default-features = false, features = ["crossterm-backend"] }
 num_enum = "0.5"
 protocol = { path = "./protocol" }
 protocol-derive = { path = "./protocol-derive" }
