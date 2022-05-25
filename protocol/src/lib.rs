@@ -11,6 +11,19 @@ pub trait Decode: Sized {
     fn decode(reader: &mut impl Read) -> IoResult<Self>;
 }
 
+// TODO: raw bool encoding is inefficient and should be replaced with bitsets.
+impl Encode for bool {
+    fn encode(&self, writer: &mut impl Write) -> IoResult<()> {
+        writer.write_u8(if *self { 1 } else { 0 })
+    }
+}
+
+impl Decode for bool {
+    fn decode(reader: &mut impl Read) -> IoResult<Self> {
+        Ok(reader.read_u8()? != 0)
+    }
+}
+
 impl Encode for u8 {
     fn encode(&self, writer: &mut impl Write) -> IoResult<()> {
         writer.write_u8(*self)
