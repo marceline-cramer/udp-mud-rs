@@ -1,4 +1,4 @@
-use crate::Pronouns;
+use crate::pronouns::Pronouns;
 use crossbeam_channel::{Receiver, Sender};
 use cursive::align::*;
 use cursive::theme::*;
@@ -104,25 +104,44 @@ impl Tui {
     }
 
     pub fn select_pronouns(siv: &mut Cursive) {
-        let mut dialog = Dialog::new();
-        dialog.set_title("Select Pronouns");
-        dialog.add_button("Custom...", |siv| {
-            siv.pop_layer();
-            Self::edit_pronouns(siv);
-        });
-        dialog.add_button("None", |siv| {
-            siv.with_user_data(|sender: &mut Sender<EditEvent>| {
-                sender.send(EditEvent::Pronouns(None)).unwrap();
-            });
-            siv.call_on_name("pronouns_text", |view: &mut TextView| {
-                view.set_content("<none>");
+        let presets = SelectView::new()
+            .with_all(
+                crate::pronouns::make_presets()
+                    .into_iter()
+                    .map(|pronouns| (pronouns.format_full(), pronouns)),
+            )
+            .on_submit(|siv, pronouns| {
+                siv.with_user_data(|sender: &mut Sender<EditEvent>| {
+                    sender
+                        .send(EditEvent::Pronouns(Some(pronouns.clone())))
+                        .unwrap();
+                });
+
+                siv.call_on_name("pronouns_text", |view: &mut TextView| {
+                    view.set_content(pronouns.format_full());
+                })
+                .unwrap();
+                siv.pop_layer();
             })
-            .unwrap();
-            siv.pop_layer();
-        });
-        dialog.add_button("Cancel", |siv| {
-            siv.pop_layer().unwrap();
-        });
+            .scrollable();
+
+        let dialog = Dialog::around(presets)
+            .title("Select Pronouns")
+            .button("Custom...", |siv| {
+                siv.pop_layer();
+                Self::edit_pronouns(siv);
+            })
+            .button("None", |siv| {
+                siv.with_user_data(|sender: &mut Sender<EditEvent>| {
+                    sender.send(EditEvent::Pronouns(None)).unwrap();
+                });
+                siv.call_on_name("pronouns_text", |view: &mut TextView| {
+                    view.set_content("<none>");
+                })
+                .unwrap();
+                siv.pop_layer();
+            })
+            .dismiss_button("Cancel");
         siv.add_layer(dialog);
     }
 
