@@ -1,5 +1,6 @@
 use crate::Pronouns;
 use crossbeam_channel::{Receiver, Sender};
+use cursive::align::*;
 use cursive::theme::*;
 use cursive::traits::*;
 use cursive::views::*;
@@ -55,6 +56,56 @@ impl Tui {
                 EditEvent::Pronouns(pronouns) => self.identity.pronouns = pronouns,
             }
         }
+
+        Self::show_main(&mut self.cursive);
+        self.cursive.run();
+    }
+
+    pub fn show_main(siv: &mut Cursive) {
+        let list = ListView::new()
+            .child("message_0000", TextView::new("Hello, world!"))
+            .with_name("messages_list")
+            .scrollable()
+            .full_height();
+
+        let message_edit = EditView::new()
+            .on_submit(|siv, text| {
+                siv.call_on_name("message_edit", |message: &mut EditView| {
+                    message.set_content("");
+                });
+                siv.call_on_name("messages_list", |list: &mut ListView| {
+                    list.add_child("new_message", TextView::new(text));
+                });
+            })
+            .with_name("message_edit")
+            .full_width();
+
+        let chat = LinearLayout::vertical().child(list).child(message_edit);
+
+        let mut rooms = SelectView::<&'static str>::new().on_submit(|siv, room: &str| {
+            let dialog = Dialog::info(format!("Selected room: {}", room));
+            siv.add_layer(dialog);
+        });
+
+        rooms.add_item("Room 1", "room_id_1");
+        rooms.add_item("Room 2", "room_id_2");
+        rooms.add_item("Room 3", "room_id_3");
+
+        let rooms = Dialog::around(rooms)
+            .title("Rooms")
+            .title_position(HAlign::Left);
+
+        let mut connections = SelectView::new();
+        connections.add_item("Connection 1", "connection_1");
+        let connections = Dialog::around(connections)
+            .title("Connections")
+            .title_position(HAlign::Left);
+
+        let sidebar = LinearLayout::vertical().child(rooms).child(connections);
+
+        let layout = LinearLayout::horizontal().child(sidebar).child(chat);
+
+        siv.add_fullscreen_layer(layout);
     }
 
     pub fn edit_identity(siv: &mut Cursive) {
@@ -77,9 +128,8 @@ impl Tui {
                 sender.send(EditEvent::Name(name)).unwrap();
                 sender.send(EditEvent::About(about)).unwrap();
             });
-            siv.pop_layer();
+            siv.quit();
         });
-        dialog.add_button("Quit", |siv| siv.quit());
 
         siv.add_layer(dialog);
     }
