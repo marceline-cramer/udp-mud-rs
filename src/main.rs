@@ -48,6 +48,67 @@ pub struct UserInfo {
 }
 
 #[derive(Debug, Decode, Encode)]
+pub struct Pronouns {
+    pub case_sensitive: bool,
+    pub plural: bool,
+
+    /// Ex. he, she, they, fae.
+    pub subject: String,
+
+    /// Ex. him, her, them, faer.
+    pub object: String,
+
+    /// Ex. his, her, their, faer.
+    pub possessive: String,
+
+    /// Ex. his, hers, theirs, faers.
+    pub possessive_pronoun: String,
+
+    /// Ex. himself, herself, themself, faerself.
+    pub reflexive: String,
+}
+
+impl Pronouns {
+    pub fn format_short(&self) -> String {
+        format!("{}/{}", self.subject, self.object)
+    }
+
+    pub fn format_pronouns(&self) -> String {
+        format!(
+            "{}/{}/{}/{}/{}",
+            self.subject, self.object, self.possessive, self.possessive_pronoun, self.reflexive
+        )
+    }
+
+    pub fn format_usage(&self) -> Option<String> {
+        let mut usages = Vec::new();
+
+        if self.plural {
+            usages.push("plural");
+        }
+
+        if self.case_sensitive {
+            usages.push("case-sensitive");
+        }
+
+        if usages.len() > 0 {
+            Some(usages.join(", "))
+        } else {
+            None
+        }
+    }
+
+    pub fn format_full(&self) -> String {
+        let pronouns = self.format_pronouns();
+        if let Some(usage) = self.format_usage() {
+            format!("{} [{}]", pronouns, usage)
+        } else {
+            pronouns
+        }
+    }
+}
+
+#[derive(Debug, Decode, Encode)]
 pub struct RoomInfo {
     pub id: String,
     pub title: String,
