@@ -11,13 +11,12 @@ pub fn make_presets() -> Vec<Pronouns> {
     // TODO add more from https://pronoun.is and https://askanonbinary.tumblr.com/pronouns
     let presets = [
         (false, false, "she", "her", "her", "hers", "herself"),
-        (false, false, "he", "him", "him", "him", "himself"),
-        (false, false, "they", "them", "their", "theirs", "themself"),
+        (false, false, "he", "him", "his", "his", "himself"),
         (false, true, "they", "them", "their", "theirs", "themselves"),
         (false, false, "fae", "faer", "faer", "faers", "faerself"),
         (false, false, "e", "em", "eir", "eirs", "emself"),
         (true, false, "E", "Em", "Eir", "Eirs", "Emself"),
-        (false, false, "it", "its", "its", "its", "itself"),
+        (false, false, "it", "it", "its", "its", "itself"),
     ];
 
     presets
