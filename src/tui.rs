@@ -1,13 +1,15 @@
 use crate::pronouns::Pronouns;
+use crossbeam_channel::Sender;
 use cursive::align::*;
 use cursive::event::{Event, Key};
 use cursive::theme::*;
 use cursive::traits::*;
 use cursive::views::*;
-use cursive::{Cursive, CursiveExt};
+use cursive::Cursive;
 
-pub fn make_cursive() -> Cursive {
+pub fn make_cursive(message_sender: Sender<String>) -> Cursive {
     let mut cursive = Cursive::new();
+    cursive.set_user_data(message_sender);
 
     cursive.update_theme(|theme| {
         theme.shadow = false;
@@ -27,6 +29,13 @@ pub fn make_cursive() -> Cursive {
     show_welcome_mat(&mut cursive);
 
     cursive
+}
+
+pub fn add_message(siv: &mut Cursive, message: &crate::Message) {
+    siv.call_on_name("messages_list", |messages: &mut LinearLayout| {
+        let text = format!("{:<24}{}", message.sender, message.contents);
+        messages.add_child(TextView::new(text));
+    });
 }
 
 pub fn show_welcome_mat(siv: &mut Cursive) {
@@ -215,9 +224,16 @@ pub fn show_main(siv: &mut Cursive) {
             siv.call_on_name("message_edit", |message: &mut EditView| {
                 message.set_content("");
             });
-            siv.call_on_name("messages_list", |messages: &mut LinearLayout| {
-                messages.add_child(TextView::new(text));
+            siv.with_user_data(|message_sender: &mut Sender<String>| {
+                message_sender.send(text.to_string()).unwrap();
             });
+            add_message(
+                siv,
+                &crate::Message {
+                    sender: "me".to_string(),
+                    contents: text.to_owned(),
+                },
+            );
         })
         .with_name("message_edit")
         .full_width();

@@ -1,4 +1,6 @@
 use clap::Parser;
+use crossbeam_channel::{Receiver, Sender};
+use cursive::Cursive;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use protocol::*;
 use protocol_derive::{Decode, Encode};
@@ -74,8 +76,13 @@ pub struct Room {
 pub struct App {
     args: Args,
     socket: UdpSocket,
+    cursive: Cursive,
     owned_rooms: HashMap<String, Room>,
     remote_rooms: HashMap<String, Room>,
+    message_sender: Sender<String>,
+    message_receiver: Receiver<String>,
+    // TODO connection management
+    other: Option<SocketAddr>,
 }
 
 impl App {
@@ -83,11 +90,19 @@ impl App {
         let socket = UdpSocket::bind(args.bind_addr).unwrap();
         socket.set_nonblocking(true).unwrap();
 
+        let (message_sender, message_receiver) = crossbeam_channel::unbounded();
+
+        let cursive = tui::make_cursive(message_sender.to_owned());
+
         let mut app = Self {
             args,
+            socket,
+            cursive,
             owned_rooms: Default::default(),
             remote_rooms: Default::default(),
-            socket,
+            message_sender,
+            message_receiver,
+            other: None,
         };
         app.startup();
         app
@@ -111,10 +126,9 @@ impl App {
     }
 
     pub fn run(mut self) {
-        let mut siv = tui::make_cursive();
+        let mut siv = tui::make_cursive(self.message_sender.to_owned());
         let siv_backend = cursive::backends::try_default().unwrap();
         let mut siv_runner = siv.runner(siv_backend);
-
         siv_runner.refresh();
 
         while siv_runner.is_running() {
@@ -124,7 +138,6 @@ impl App {
             // TODO error handling of non-non-blocking errors
             if let Ok((len, from)) = self.socket.recv_from(&mut buf) {
                 let mut buf = buf.as_slice();
-                println!("recv'd from {:?}: {:?}", from, &buf[..len]);
 
                 let kind = Var::<u16>::decode(&mut buf).unwrap().0;
                 let kind: PacketKind = match kind.try_into() {
@@ -135,13 +148,34 @@ impl App {
                     }
                 };
 
-                self.on_packet(from, kind, buf);
+                if let Some(message) = self.on_packet(from, kind, buf) {
+                    tui::add_message(&mut siv_runner, &message);
+                    siv_runner.refresh(); // TODO better refresh management
+                }
+            }
+
+            if let Some(other) = self.other.as_ref() {
+                while let Ok(message) = self.message_receiver.try_recv() {
+                    eprintln!("sending message: {}", message);
+                    self.send_packet(other, PacketKind::Message, |writer| {
+                        let message = Message {
+                            sender: self.args.username.clone(),
+                            contents: message,
+                        };
+                        message.encode(writer)
+                    })
+                    .unwrap();
+                }
             }
         }
     }
 
-    pub fn on_packet(&mut self, from: SocketAddr, kind: PacketKind, mut reader: &[u8]) {
+    pub fn on_packet(&mut self, from: SocketAddr, kind: PacketKind, mut reader: &[u8]) -> Option<Message> {
         println!("handling {:?}", kind);
+
+        // TODO proper connection management
+        self.other = Some(from);
+
         match kind {
             PacketKind::Ping => self.send_empty_packet(from, PacketKind::Pong).unwrap(),
             PacketKind::Pong => self
@@ -178,8 +212,14 @@ impl App {
                 eprintln!("Received room info: {:#?}", info);
                 self.remote_rooms.insert(info.id.clone(), Room { info });
             }
+            PacketKind::Message => {
+                let message = Message::decode(&mut reader).unwrap();
+                return Some(message);
+            }
             kind => eprintln!("unimplemented packet handler for {:?}", kind),
         }
+
+        None
     }
 
     pub fn build_room_list(&self) -> RoomList {
