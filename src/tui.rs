@@ -1,6 +1,7 @@
 use crate::pronouns::Pronouns;
 use crossbeam_channel::{Receiver, Sender};
 use cursive::align::*;
+use cursive::event::{Event, Key};
 use cursive::theme::*;
 use cursive::traits::*;
 use cursive::views::*;
@@ -33,6 +34,11 @@ impl Tui {
             palette[PaletteColor::View] = Color::TerminalDefault;
             palette[PaletteColor::Primary] = Color::TerminalDefault;
         });
+
+        cursive.add_global_callback(Event::Char('h'), |siv| siv.on_event(Event::Key(Key::Left)));
+        cursive.add_global_callback(Event::Char('j'), |siv| siv.on_event(Event::Key(Key::Down)));
+        cursive.add_global_callback(Event::Char('k'), |siv| siv.on_event(Event::Key(Key::Up)));
+        cursive.add_global_callback(Event::Char('l'), |siv| siv.on_event(Event::Key(Key::Right)));
 
         Self {
             cursive,
@@ -256,8 +262,8 @@ impl Tui {
     }
 
     pub fn show_main(siv: &mut Cursive) {
-        let list = ListView::new()
-            .child("message_0000", TextView::new("Hello, world!"))
+        let messages = LinearLayout::vertical()
+            .child(TextView::new("Hello, world!"))
             .with_name("messages_list")
             .scrollable()
             .full_height();
@@ -267,14 +273,29 @@ impl Tui {
                 siv.call_on_name("message_edit", |message: &mut EditView| {
                     message.set_content("");
                 });
-                siv.call_on_name("messages_list", |list: &mut ListView| {
-                    list.add_child("new_message", TextView::new(text));
+                siv.call_on_name("messages_list", |messages: &mut LinearLayout| {
+                    messages.add_child(TextView::new(text));
                 });
             })
             .with_name("message_edit")
             .full_width();
 
-        let chat = LinearLayout::vertical().child(list).child(message_edit);
+        let message_edit = Panel::new(message_edit)
+            .title("Send Message")
+            .title_position(HAlign::Left);
+
+        let upload_button = Button::new("Upload", |siv| {
+            siv.add_layer(Dialog::info("Uploading system goes here"))
+        });
+
+        let message_buttons = Panel::new(upload_button);
+
+        let message_bar = LinearLayout::horizontal()
+            .child(message_edit)
+            .child(message_buttons);
+
+        let chat = LinearLayout::vertical().child(messages).child(message_bar);
+        let chat = Panel::new(chat).title("Chat");
 
         let mut rooms = SelectView::<&'static str>::new().on_submit(|siv, room: &str| {
             let dialog = Dialog::info(format!("Selected room: {}", room));
