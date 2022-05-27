@@ -73,7 +73,6 @@ pub struct Room {
 
 pub struct App {
     args: Args,
-    tui: tui::Tui,
     socket: UdpSocket,
     owned_rooms: HashMap<String, Room>,
     remote_rooms: HashMap<String, Room>,
@@ -82,9 +81,10 @@ pub struct App {
 impl App {
     pub fn new(args: Args) -> Self {
         let socket = UdpSocket::bind(args.bind_addr).unwrap();
+        socket.set_nonblocking(true).unwrap();
+
         let mut app = Self {
             args,
-            tui: tui::Tui::new(),
             owned_rooms: Default::default(),
             remote_rooms: Default::default(),
             socket,
@@ -111,23 +111,32 @@ impl App {
     }
 
     pub fn run(mut self) {
-        self.tui.run();
+        let mut siv = tui::make_cursive();
+        let siv_backend = cursive::backends::try_default().unwrap();
+        let mut siv_runner = siv.runner(siv_backend);
 
-        let mut buf = [0u8; 65507];
-        while let Ok((len, from)) = self.socket.recv_from(&mut buf) {
-            let mut buf = buf.as_slice();
-            println!("recv'd from {:?}: {:?}", from, &buf[..len]);
+        siv_runner.refresh();
 
-            let kind = Var::<u16>::decode(&mut buf).unwrap().0;
-            let kind: PacketKind = match kind.try_into() {
-                Ok(kind) => kind,
-                Err(int) => {
-                    eprintln!("unrecognized packet kind {}", int);
-                    continue;
-                }
-            };
+        while siv_runner.is_running() {
+            siv_runner.step();
 
-            self.on_packet(from, kind, buf);
+            let mut buf = [0u8; 65507];
+            // TODO error handling of non-non-blocking errors
+            if let Ok((len, from)) = self.socket.recv_from(&mut buf) {
+                let mut buf = buf.as_slice();
+                println!("recv'd from {:?}: {:?}", from, &buf[..len]);
+
+                let kind = Var::<u16>::decode(&mut buf).unwrap().0;
+                let kind: PacketKind = match kind.try_into() {
+                    Ok(kind) => kind,
+                    Err(int) => {
+                        eprintln!("unrecognized packet kind {}", int);
+                        continue;
+                    }
+                };
+
+                self.on_packet(from, kind, buf);
+            }
         }
     }
 
