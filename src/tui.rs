@@ -103,34 +103,57 @@ impl Tui {
         siv.add_layer(dialog);
     }
 
+    fn make_example_usage_panel() -> impl View {
+        let text = TextView::new("Highlight a pronoun set to preview its usage!")
+            .with_name("pronoun_example_text")
+            .fixed_width(50)
+            .scrollable();
+        Panel::new(text).title("Example Usage")
+    }
+
+    fn update_pronouns_edit(siv: &mut Cursive, pronouns: &Pronouns) {
+        siv.call_on_name("pronoun_example_text", |view: &mut TextView| {
+            view.set_content(pronouns.make_example_usage());
+        });
+
+        siv.with_user_data(|sender: &mut Sender<EditEvent>| {
+            sender
+                .send(EditEvent::Pronouns(Some(pronouns.clone())))
+                .unwrap();
+        });
+
+        siv.call_on_name("pronouns_text", |view: &mut TextView| {
+            view.set_content(pronouns.format_full());
+        })
+        .unwrap();
+    }
+
     pub fn select_pronouns(siv: &mut Cursive) {
+        let example = TextView::new("Highlight a pronoun set to preview its usage!")
+            .with_name("pronoun_example_text")
+            .fixed_width(35)
+            .scrollable();
+
         let presets = SelectView::new()
             .with_all(
                 crate::pronouns::make_presets()
                     .into_iter()
                     .map(|pronouns| (pronouns.format_full(), pronouns)),
             )
-            .on_submit(|siv, pronouns| {
-                siv.with_user_data(|sender: &mut Sender<EditEvent>| {
-                    sender
-                        .send(EditEvent::Pronouns(Some(pronouns.clone())))
-                        .unwrap();
-                });
-
-                siv.call_on_name("pronouns_text", |view: &mut TextView| {
-                    view.set_content(pronouns.format_full());
-                })
-                .unwrap();
-                siv.pop_layer();
-            })
+            .on_select(|siv, pronouns| Self::update_pronouns_edit(siv, pronouns))
             .scrollable();
 
-        let dialog = Dialog::around(presets)
+        let layout = LinearLayout::horizontal()
+            .child(Panel::new(presets).title("Presets"))
+            .child(Panel::new(example).title("Example Usage"));
+
+        let dialog = Dialog::around(layout)
             .title("Select Pronouns")
             .button("Custom...", |siv| {
                 siv.pop_layer();
                 Self::edit_pronouns(siv);
             })
+            .dismiss_button("Ok")
             .button("None", |siv| {
                 siv.with_user_data(|sender: &mut Sender<EditEvent>| {
                     sender.send(EditEvent::Pronouns(None)).unwrap();
@@ -140,9 +163,28 @@ impl Tui {
                 })
                 .unwrap();
                 siv.pop_layer();
-            })
-            .dismiss_button("Cancel");
+            });
         siv.add_layer(dialog);
+    }
+
+    fn get_edit_pronouns(siv: &mut Cursive) -> Pronouns {
+        let case_sensitive = get_checkbox_contents(siv, "case_sensitive_edit");
+        let plural = get_checkbox_contents(siv, "plural_edit");
+        let subject = get_edit_contents(siv, "subject_edit");
+        let object = get_edit_contents(siv, "object_edit");
+        let possessive = get_edit_contents(siv, "possessive_edit");
+        let possessive_pronoun = get_edit_contents(siv, "possessive_pronoun_edit");
+        let reflexive = get_edit_contents(siv, "reflexive_edit");
+
+        Pronouns {
+            case_sensitive,
+            plural,
+            subject,
+            object,
+            possessive,
+            possessive_pronoun,
+            reflexive,
+        }
     }
 
     pub fn edit_pronouns(siv: &mut Cursive) {
@@ -157,52 +199,58 @@ impl Tui {
         ])
         .fixed_width(20);
 
-        let values = LinearLayout::vertical()
-            .child(Checkbox::new().with_name("case_sensitive_edit"))
-            .child(Checkbox::new().with_name("plural_edit"))
-            .child(EditView::new().with_name("subject_edit"))
-            .child(EditView::new().with_name("object_edit"))
-            .child(EditView::new().with_name("possessive_edit"))
-            .child(EditView::new().with_name("possessive_pronoun_edit"))
-            .child(EditView::new().with_name("reflexive_edit"))
-            .fixed_width(12);
+        let mut values = LinearLayout::vertical();
 
-        let columns = LinearLayout::horizontal().child(labels).child(values);
-        let mut dialog = Dialog::around(columns);
-        dialog.set_title("Edit Pronouns");
-        dialog.add_button("Ok", |siv| {
-            let case_sensitive = get_checkbox_contents(siv, "case_sensitive_edit");
-            let plural = get_checkbox_contents(siv, "plural_edit");
-            let subject = get_edit_contents(siv, "subject_edit");
-            let object = get_edit_contents(siv, "object_edit");
-            let possessive = get_edit_contents(siv, "possessive_edit");
-            let possessive_pronoun = get_edit_contents(siv, "possessive_pronoun_edit");
-            let reflexive = get_edit_contents(siv, "reflexive_edit");
+        let checkboxes = &["case_sensitive_edit", "plural_edit"];
 
-            let pronouns = Pronouns {
-                case_sensitive,
-                plural,
-                subject,
-                object,
-                possessive,
-                possessive_pronoun,
-                reflexive,
-            };
+        for name in checkboxes.iter() {
+            values.add_child(
+                Checkbox::new()
+                    .on_change(|siv, _value| {
+                        let pronouns = Self::get_edit_pronouns(siv);
+                        Self::update_pronouns_edit(siv, &pronouns);
+                    })
+                    .with_name(*name),
+            );
+        }
 
-            siv.call_on_name("pronouns_text", |view: &mut TextView| {
-                view.set_content(pronouns.format_full());
+        let edit_views = &[
+            "subject_edit",
+            "object_edit",
+            "possessive_edit",
+            "possessive_pronoun_edit",
+            "reflexive_edit",
+        ];
+
+        for name in edit_views.iter() {
+            values.add_child(
+                EditView::new()
+                    .on_edit(|siv, _text, _cursor| {
+                        let pronouns = Self::get_edit_pronouns(siv);
+                        Self::update_pronouns_edit(siv, &pronouns);
+                    })
+                    .with_name(*name),
+            );
+        }
+
+        let edit_layout = Panel::new(
+            LinearLayout::horizontal()
+                .child(labels)
+                .child(values.fixed_width(12)),
+        );
+
+        let example = Self::make_example_usage_panel();
+
+        let layout = LinearLayout::horizontal().child(edit_layout).child(example);
+
+        let dialog = Dialog::around(layout)
+            .title("Edit Pronouns")
+            .button("Ok", |siv| {
+                let pronouns = Self::get_edit_pronouns(siv);
+                Self::update_pronouns_edit(siv, &pronouns);
+                siv.pop_layer();
             })
-            .unwrap();
-
-            siv.with_user_data(|sender: &mut Sender<EditEvent>| {
-                sender.send(EditEvent::Pronouns(Some(pronouns))).unwrap();
-            });
-
-            siv.pop_layer();
-        });
-        dialog.add_button("Cancel", |siv| {
-            siv.pop_layer().unwrap();
-        });
+            .dismiss_button("Cancel");
 
         siv.add_layer(dialog);
     }

@@ -16,3 +16,5 @@ cursive = { version = "0.18", default-features = false, features = ["crossterm-b
 num_enum = "0.5"
 protocol = { path = "./protocol" }
 protocol-derive = { path = "./protocol-derive" }
+serde = { version = "1", features = ["derive"] }
+tinytemplate = "1.2.1"

@@ -1,0 +1,23 @@
+warning: associated function is never used: `format_short`
+  --> src/pronouns.rs:71:12
+   |
+71 |     pub fn format_short(&self) -> String {
+   |            ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: field is never read: `edit_receiver`
+  --> src/tui.rs:17:5
+   |
+17 |     edit_receiver: Receiver<EditEvent>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field is never read: `identity`
+  --> src/tui.rs:18:5
+   |
+18 |     identity: Identity,
+   |     ^^^^^^^^^^^^^^^^^^
+
+warning: `udp-mud` (bin "udp-mud") generated 3 warnings
+    Finished release [optimized] target(s) in 0.05s
+     Running `target/release/udp-mud --username server --bind-addr '0.0.0.0:54321' --connect '98.43.173.90:54321'`
