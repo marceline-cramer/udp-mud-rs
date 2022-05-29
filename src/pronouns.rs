@@ -5,7 +5,9 @@ pub const EXAMPLE_USAGE: &str = "{S} went to the park.
 I went with {o}.
 {S} brought {p} frisbee.
 At least I think it was {pp}.
-{S} threw the frisbee to {r}.";
+{S} threw the frisbee to {r}.
+{S} {{pl ? are : is}} happy.
+{S} {{if pl}}are{{else}}is{{endif}} happy.";
 
 pub fn make_presets() -> Vec<Pronouns> {
     // TODO add more from https://pronoun.is and https://askanonbinary.tumblr.com/pronouns
@@ -13,6 +15,7 @@ pub fn make_presets() -> Vec<Pronouns> {
         (false, false, "she", "her", "her", "hers", "herself"),
         (false, false, "he", "him", "his", "his", "himself"),
         (false, true, "they", "them", "their", "theirs", "themselves"),
+        (false, true, "they", "them", "their", "theirs", "themself"),
         (false, false, "fae", "faer", "faer", "faers", "faerself"),
         (false, false, "e", "em", "eir", "eirs", "emself"),
         (true, false, "E", "Em", "Eir", "Eirs", "Emself"),
@@ -146,7 +149,10 @@ impl Pronouns {
 /// Baked pronoun lookup table for formatting messages.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PronounTable {
+    #[serde(rename = "cs")]
     pub case_sensitive: bool,
+
+    #[serde(rename = "pl")]
     pub plural: bool,
 
     #[serde(rename = "s")]
