@@ -4,6 +4,7 @@ use cursive::align::*;
 use cursive::event::{Event, Key};
 use cursive::theme::*;
 use cursive::traits::*;
+use cursive::view::*;
 use cursive::views::*;
 use cursive::Cursive;
 
@@ -33,9 +34,20 @@ pub fn make_cursive(message_sender: Sender<String>) -> Cursive {
 
 pub fn add_message(siv: &mut Cursive, message: &crate::Message) {
     siv.call_on_name("messages_list", |messages: &mut LinearLayout| {
-        let text = format!("{:<24}{}", message.sender, message.contents);
-        messages.add_child(TextView::new(text));
+        let text = format!("{:<16}{}", message.sender, message.contents);
+        let mut text = TextView::new(text);
+        text.set_content_wrap(true);
+        messages.add_child(text);
     });
+
+    siv.call_on_name(
+        "messages_list_scroll",
+        |scroll: &mut ScrollView<NamedView<LinearLayout>>| {
+            if scroll.is_at_bottom() {
+                scroll.set_scroll_strategy(ScrollStrategy::StickToBottom);
+            }
+        },
+    );
 }
 
 pub fn show_welcome_mat(siv: &mut Cursive) {
@@ -215,8 +227,11 @@ pub fn edit_pronouns(siv: &mut Cursive) {
 pub fn show_main(siv: &mut Cursive) {
     let messages = LinearLayout::vertical()
         .child(TextView::new("Hello, world!"))
-        .with_name("messages_list")
-        .scrollable()
+        .with_name("messages_list");
+
+    let messages = ScrollView::new(messages)
+        .scroll_strategy(ScrollStrategy::StickToBottom)
+        .with_name("messages_list_scroll")
         .full_height();
 
     let message_edit = EditView::new()
@@ -279,7 +294,10 @@ pub fn show_main(siv: &mut Cursive) {
         .title_position(HAlign::Left)
         .with_name("connection_s");
 
-    let sidebar = LinearLayout::vertical().child(rooms).child(connections);
+    let sidebar = LinearLayout::vertical()
+        .child(rooms)
+        .child(connections)
+        .fixed_width(24);
 
     let layout = LinearLayout::horizontal().child(sidebar).child(chat);
 
