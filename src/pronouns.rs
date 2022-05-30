@@ -6,7 +6,6 @@ I went with {o}.
 {S} brought {p} frisbee.
 At least I think it was {pp}.
 {S} threw the frisbee to {r}.
-{S} {{pl ? are : is}} happy.
 {S} {{if pl}}are{{else}}is{{endif}} happy.";
 
 pub fn make_presets() -> Vec<Pronouns> {
